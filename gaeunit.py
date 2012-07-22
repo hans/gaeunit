@@ -526,7 +526,7 @@ def _create_suite(package_name, test_name, test_dir,
                                                            match_fn=match_fn))
 
         if suite.countTestCases() == 0:
-            raise Exception("'%s' is not found or does not contain any tests." %  \
+            raise Exception("'%s' is not found or does not contain any matching tests." %  \
                             (test_name or package_name or 'local directory: \"%s\"' % _LOCAL_TEST_DIR))
     except Exception, e:
         error = str(e)
