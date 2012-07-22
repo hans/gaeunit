@@ -359,6 +359,8 @@ class MainTestPageHandler(webapp.RequestHandler):
             self.response.out.write(" ".join(errors))
             return False
 
+        return True
+
     def _render(self, suite, error):
         """
         Render a generated test suite.
