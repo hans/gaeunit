@@ -261,9 +261,11 @@ class MainTestPageHandler(webapp.RequestHandler):
 
         suite, error = _create_suite(package_name, test_name, _LOCAL_TEST_DIR)
         if not error:
-            self.response.out.write("====================\n" \
-                                    "GAEUnit Test Results\n" \
-                                    "====================\n\n")
+            if self.request.get("header"):
+                self.response.out.write("====================\n" \
+                                        "GAEUnit Test Results\n" \
+                                        "====================\n\n")
+
             _run_test_suite(runner, suite)
             self.response.out.write(output_buffer.getvalue())
             output_buffer.close()
