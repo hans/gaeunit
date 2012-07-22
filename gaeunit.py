@@ -225,19 +225,13 @@ class MainTestPageHandler(webapp.RequestHandler):
     def get(self):
         self._check_unknown_arguments()
 
-        format = self.request.get("format", "html")
+        # Create the test suite
         package_name = self.request.get("package")
         test_name = self.request.get("name")
-        if format == "html":
-            self._render_html(package_name, test_name)
-        elif format == "plain":
-            self._render_plain(package_name, test_name)
-        else:
-            error = _log_error("The format '%s' is not valid." % cgi.escape(format))
-            self.error(404)
-            self.response.out.write(error)
+        suite, error = _create_suite(package_name, test_name, _LOCAL_TEST_DIR)
+        self._render(suite, error)
 
-    def _check_unknown_arguments():
+    def _check_unknown_arguments(self):
         """
         Fail if any unknown GET parameters are provided to the script.
         """
@@ -252,22 +246,42 @@ class MainTestPageHandler(webapp.RequestHandler):
             self.response.out.write(" ".join(errors))
             return
 
-    def _render_html(self, package_name, test_name):
+    def _render(self, suite, error):
         """
-        Display an HTML page describing the test results to the client.
+        Render a generated test suite.
         """
 
-        suite, error = _create_suite(package_name, test_name, _LOCAL_TEST_DIR)
-        if not error:
-            self.response.out.write(_MAIN_PAGE_CONTENT % (_test_suite_to_json(suite), _WEB_TEST_DIR, __version__))
-        else:
+        format = self.request.get("format", "html")
+
+        if error:
+            if format == "plain":
+                self.response.headers["Content-Type"] = "text/plain"
+
             self.error(404)
             self.response.out.write(error)
 
-    def _render_plain(self, package_name, test_name):
+        if format == "html":
+            self._render_html(suite)
+        elif format == "plain":
+            self._render_plain(suite)
+        else:
+            error = _log_error("The format '%s' is not valid." % cgi.escape(format))
+            self.error(404)
+            self.response.out.write(error)
+
+    def _render_html(self, suite):
         """
-        Returns unittest's plaintext output without modifications to the
-        client.
+        Render an HTML page which is prepped to run the tests.
+        """
+
+        self.response.out.write(_MAIN_PAGE_CONTENT
+                                % (_test_suite_to_json(suite), _WEB_TEST_DIR,
+                                   __version__))
+
+    def _render_plain(self, suite):
+        """
+        Run the test suite and return unittest's plaintext output
+        without modifications to the client.
         """
 
         self.response.headers["Content-Type"] = "text/plain"
@@ -275,19 +289,14 @@ class MainTestPageHandler(webapp.RequestHandler):
         output_buffer = StringIO.StringIO()
         runner = unittest.TextTestRunner(output_buffer)
 
-        suite, error = _create_suite(package_name, test_name, _LOCAL_TEST_DIR)
-        if not error:
-            if self.request.get("header"):
-                self.response.out.write("====================\n" \
-                                        "GAEUnit Test Results\n" \
-                                        "====================\n\n")
+        if self.request.get("header"):
+            self.response.out.write("====================\n" \
+                                    "GAEUnit Test Results\n" \
+                                    "====================\n\n")
 
-            _run_test_suite(runner, suite)
-            self.response.out.write(output_buffer.getvalue())
-            output_buffer.close()
-        else:
-            self.error(404)
-            self.response.out.write(error)
+        _run_test_suite(runner, suite)
+        self.response.out.write(output_buffer.getvalue())
+        output_buffer.close()
 
 
 ##############################################################################
