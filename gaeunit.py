@@ -335,7 +335,8 @@ class GAETestLoader(unittest.TestLoader):
 
 class MainTestPageHandler(webapp.RequestHandler):
     def get(self):
-        self._check_unknown_arguments()
+        if not self._check_unknown_arguments():
+            return
 
         # Create the test suite
         package_name = self.request.get("package")
@@ -356,7 +357,7 @@ class MainTestPageHandler(webapp.RequestHandler):
                 errors.append(_log_error("The request parameter '%s' is not valid." % arg))
             self.error(404)
             self.response.out.write(" ".join(errors))
-            return
+            return False
 
     def _render(self, suite, error):
         """
