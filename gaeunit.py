@@ -622,7 +622,7 @@ _MAIN_PAGE_CONTENT = """
         #results tr#details td { width: 25%%; }
         #testindicator {width:750px; height:16px; border-style:solid; border-width:2px 1px 1px 2px; background-color:#f8f8f8;}
         #footerarea {text-align:center; font-size:83%%; padding-top:25px}
-        #errorarea {padding-top:25px}
+        #testarea {padding-top:25px}
         .error {border-color: #c3d9ff; border-style: solid; border-width: 2px 1px 2px 1px; width:750px; padding:1px; margin:0pt auto; text-align:left}
         .errtitle {background-color:#c3d9ff; font-weight:bold}
     </style>
@@ -675,23 +675,31 @@ _MAIN_PAGE_CONTENT = """
                     var errors = result.errors;
                     var failures = result.failures;
                     var details = "";
-                    for(var i=0; i<errors.length; i++) {
-                        details += '<p><div class="error"><div class="errtitle">ERROR ' +
-                                   errors[i].desc +
-                                   '</div><div class="errdetail"><pre>'+errors[i].detail +
-                                   '</pre></div></div></p>';
+
+                    if ( errors.length > 0 || failures.length > 0 ) {
+                        for(var i=0; i<errors.length; i++) {
+                            details += '<p><div class="error"><div class="errtitle">ERROR ' +
+                                       errors[i].desc +
+                                       '</div><div class="errdetail"><pre>'+errors[i].detail +
+                                       '</pre></div></div></p>';
+                        }
+                        for(var i=0; i<failures.length; i++) {
+                            details += '<p><div class="error"><div class="errtitle">FAILURE ' +
+                                        failures[i].desc +
+                                        '</div><div class="errdetail"><pre>' +
+                                        failures[i].detail +
+                                        '</pre></div></div></p>';
+                        }
+                    } else {
+                        details += '<p><div class="error"><div class="errtitle">' +
+                                   moduleName + "." + className + methodSuffix +
+                                   '</div></div></p>';
                     }
-                    for(var i=0; i<failures.length; i++) {
-                        details += '<p><div class="error"><div class="errtitle">FAILURE ' +
-                                    failures[i].desc +
-                                    '</div><div class="errdetail"><pre>' +
-                                    failures[i].detail +
-                                    '</pre></div></div></p>';
-                    }
-                    var errorArea = document.getElementById("errorarea");
-                    errorArea.innerHTML += details;
+
+                    var testArea = document.getElementById("testarea");
+                    testArea.innerHTML += details;
                 } else {
-                    document.getElementById("errorarea").innerHTML = xmlHttp.responseText;
+                    document.getElementById("testarea").innerHTML = xmlHttp.responseText;
                     testFailed();
                 }
             };
@@ -747,7 +755,7 @@ _MAIN_PAGE_CONTENT = """
             </tr>
         </tbody></table>
     </div>
-    <div id="errorarea"></div>
+    <div id="testarea"></div>
     <div id="footerarea">
         <div id="weblink">
         <p>
