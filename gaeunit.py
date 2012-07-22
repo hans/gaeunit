@@ -226,6 +226,12 @@ class GAETestLoader(unittest.TestLoader):
     load tests.
     """
 
+    def _qualify_test_name(self, class_instance, name):
+        method = getattr(class_instance, name)
+        return '%s.%s.%s' % (method.__module__,
+                             method.__self__.__class__.__name__,
+                             method.__name__)
+
     def loadTestsFromTestCase(self, testCaseClass, match_fn=None):
         """
         Return a suite of all test cases contained in the given test
@@ -241,15 +247,10 @@ class GAETestLoader(unittest.TestLoader):
             testCaseNames = ['runTest']
 
         if match_fn:
-            def qualify_test_name(name):
-                method = getattr(testCaseClass, name)
-                return '%s.%s.%s' % (method.__module__,
-                                     method.__self__.__class__.__name__,
-                                     method.__name__)
-
             testCaseNames = [name
                              for name in testCaseNames
-                             if match_fn(qualify_test_name(name))]
+                             if match_fn(self._qualify_test_name(testCaseClass,
+                                                                name))]
 
         loaded_suite = self.suiteClass(map(testCaseClass, testCaseNames))
         return loaded_suite
@@ -312,7 +313,12 @@ class GAETestLoader(unittest.TestLoader):
         elif (isinstance(obj, types.UnboundMethodType) and
               isinstance(parent, type) and
               issubclass(parent, unittest.TestCase)):
-            return self.suiteClass([parent(obj.__name__)])
+            if ( not match_fn
+                 or ( match_fn
+                      and match_fn(self._qualify_test_name(parent,
+                                                         obj.__name__)) ) ):
+                return self.suiteClass([parent(obj.__name__)])
+            return self.suiteClass([])
         elif isinstance(obj, unittest.TestSuite):
             return obj
         elif hasattr(obj, '__call__'):
@@ -341,7 +347,9 @@ class MainTestPageHandler(webapp.RequestHandler):
         # Create the test suite
         package_name = self.request.get("package")
         test_name = self.request.get("name")
-        suite, error = _create_suite(package_name, test_name, _LOCAL_TEST_DIR)
+        test_regex = self.request.get("regex")
+        suite, error = _create_suite(package_name, test_name, _LOCAL_TEST_DIR,
+                                     test_regex=test_regex)
         self._render(suite, error)
 
     def _check_unknown_arguments(self):
@@ -350,7 +358,7 @@ class MainTestPageHandler(webapp.RequestHandler):
         """
 
         unknown_args = [arg for arg in self.request.arguments()
-                        if arg not in ("format", "package", "name")]
+                        if arg not in ("format", "package", "name", "regex")]
         if len(unknown_args) > 0:
             errors = []
             for arg in unknown_args:
