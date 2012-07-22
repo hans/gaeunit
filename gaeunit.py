@@ -61,12 +61,14 @@ __url__ = "http://code.google.com/p/gaeunit"
 import sys
 import os
 import unittest
+import unittest.loader
 import time
 import logging
 import cgi
 import re
 import django.utils.simplejson
 import StringIO
+import types
 
 from xml.sax.saxutils import unescape
 from google.appengine.ext import webapp
@@ -148,6 +150,8 @@ def django_json_test_runner(request):
     return response
 
 ########################################################
+# unittest subclasses
+########################################################
 
 class GAETestCase(unittest.TestCase):
     """TestCase parent class that provides the following assert functions
@@ -214,6 +218,114 @@ class GAETestCase(unittest.TestCase):
         return '\n%s%s%s\n%s\n%s^' % (leading_dots, html1[start:end], ending_dots, leading_dots+html2[start:end]+ending_dots, "_" * (i - start + len(leading_dots)))
 
     assertHtmlEquals = assertHtmlEqual
+
+
+class GAETestLoader(unittest.TestLoader):
+    """
+    Custom loader which overrides methods used elsewhere in GAEUnit to
+    load tests.
+    """
+
+    def loadTestsFromTestCase(self, testCaseClass, match_fn=None):
+        """
+        Return a suite of all test cases contained in the given test
+        case, filtered using a given match function.
+        """
+
+        if issubclass(testCaseClass, unittest.TestSuite):
+            raise TypeError("Test cases should not be derived from TestSuite." \
+                            "Maybe you meant to derive from TestCase?")
+
+        testCaseNames = self.getTestCaseNames(testCaseClass)
+        if not testCaseNames and hasattr(testCaseClass, 'runTest'):
+            testCaseNames = ['runTest']
+
+        if match_fn:
+            def qualify_test_name(name):
+                method = getattr(testCaseClass, name)
+                return '%s.%s.%s' % (method.__module__,
+                                     method.__self__.__class__.__name__,
+                                     method.__name__)
+
+            testCaseNames = [name
+                             for name in testCaseNames
+                             if match_fn(qualify_test_name(name))]
+
+        loaded_suite = self.suiteClass(map(testCaseClass, testCaseNames))
+        return loaded_suite
+
+    def loadTestsFromModule(self, module, match_fn=None, use_load_tests=True):
+        """
+        Return a suite of all test cases contained in the given module,
+        filtered using a given match function.
+        """
+
+        tests = []
+        for name in dir(module):
+            obj = getattr(module, name)
+
+            if isinstance(obj, type) and issubclass(obj, unittest.TestCase):
+                tests.append(self.loadTestsFromTestCase(obj, match_fn))
+
+        load_tests = getattr(module, 'load_tests', None)
+        tests = self.suiteClass(tests)
+        if use_load_tests and load_tests is not None:
+            try:
+                return load_tests(self, tests, None)
+            except Exception, e:
+                return unittest.loader._make_failed_load_tests(module.__name__,
+                                                               e,
+                                                               self.suiteClass)
+
+        return tests
+
+    def loadTestsFromName(self, name, module=None, match_fn=None):
+        """Return a suite of all tests cases given a string specifier.
+
+        The name may resolve either to a module, a test case class, a
+        test method within a test case class, or a callable object which
+        returns a TestCase or TestSuite instance.
+
+        The method optionally resolves the names relative to a given module.
+        """
+
+        parts = name.split('.')
+        if module is None:
+            parts_copy = parts[:]
+            while parts_copy:
+                try:
+                    module = __import__('.'.join(parts_copy))
+                    break
+                except ImportError:
+                    del parts_copy[-1]
+                    if not parts_copy:
+                        raise
+            parts = parts[1:]
+        obj = module
+        for part in parts:
+            parent, obj = obj, getattr(obj, part)
+
+        if isinstance(obj, types.ModuleType):
+            return self.loadTestsFromModule(obj, match_fn)
+        elif isinstance(obj, type) and issubclass(obj, unittest.TestCase):
+            return self.loadTestsFromTestCase(obj, match_fn)
+        elif (isinstance(obj, types.UnboundMethodType) and
+              isinstance(parent, type) and
+              issubclass(parent, unittest.TestCase)):
+            return self.suiteClass([parent(obj.__name__)])
+        elif isinstance(obj, unittest.TestSuite):
+            return obj
+        elif hasattr(obj, '__call__'):
+            test = obj()
+            if isinstance(test, unittest.TestSuite):
+                return test
+            elif isinstance(test, unittest.TestCase):
+                return self.suiteClass([test])
+            else:
+                raise TypeError("calling %s returned %s, not a test" %
+                                (obj, test))
+        else:
+            raise TypeError("don't know how to make test from: %s" % obj)
 
 
 ##############################################################################
@@ -370,25 +482,37 @@ class JsonTestListHandler(webapp.RequestHandler):
 ##############################################################################
 
 
-def _create_suite(package_name, test_name, test_dir):
-    loader = unittest.defaultTestLoader
+def _create_suite(package_name, test_name, test_dir,
+                test_regex=r"(?:^|[b_./-])[Tt]est"):
+    loader = GAETestLoader()
     suite = unittest.TestSuite()
 
     error = None
+
+    def match_fn(test_name):
+        """
+        Determine whether a qualified test name (module.class.method)
+        should be run.
+        """
+
+        return not not re.search(test_regex, test_name)
 
     try:
         if not package_name and not test_name:
                 modules = _load_default_test_modules(test_dir)
                 for module in modules:
-                    suite.addTest(loader.loadTestsFromModule(module))
+                    suite.addTest(loader.loadTestsFromModule(module, match_fn))
         elif test_name:
                 _load_default_test_modules(test_dir)
-                suite.addTest(loader.loadTestsFromName(test_name))
+                suite.addTest(loader.loadTestsFromName(test_name,
+                                                       match_fn=match_fn))
         elif package_name:
                 package = reload(__import__(package_name))
                 module_names = package.__all__
                 for module_name in module_names:
-                    suite.addTest(loader.loadTestsFromName('%s.%s' % (package_name, module_name)))
+                    qualified_name = '%s.%s' % (package_name, module_name)
+                    suite.addTest(loader.loadTestsFromName(qualified_name,
+                                                           match_fn=match_fn))
 
         if suite.countTestCases() == 0:
             raise Exception("'%s' is not found or does not contain any tests." %  \
@@ -466,8 +590,8 @@ def _run_test_suite(runner, suite):
 
 
 def _log_error(s):
-   logging.warn(s)
-   return s
+    logging.warn(s)
+    return s
 
 
 ################################################
