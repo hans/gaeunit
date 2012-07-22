@@ -223,15 +223,7 @@ class GAETestCase(unittest.TestCase):
 
 class MainTestPageHandler(webapp.RequestHandler):
     def get(self):
-        unknown_args = [arg for arg in self.request.arguments()
-                        if arg not in ("format", "package", "name")]
-        if len(unknown_args) > 0:
-            errors = []
-            for arg in unknown_args:
-                errors.append(_log_error("The request parameter '%s' is not valid." % arg))
-            self.error(404)
-            self.response.out.write(" ".join(errors))
-            return
+        self._check_unknown_arguments()
 
         format = self.request.get("format", "html")
         package_name = self.request.get("package")
@@ -245,7 +237,26 @@ class MainTestPageHandler(webapp.RequestHandler):
             self.error(404)
             self.response.out.write(error)
 
+    def _check_unknown_arguments():
+        """
+        Fail if any unknown GET parameters are provided to the script.
+        """
+
+        unknown_args = [arg for arg in self.request.arguments()
+                        if arg not in ("format", "package", "name")]
+        if len(unknown_args) > 0:
+            errors = []
+            for arg in unknown_args:
+                errors.append(_log_error("The request parameter '%s' is not valid." % arg))
+            self.error(404)
+            self.response.out.write(" ".join(errors))
+            return
+
     def _render_html(self, package_name, test_name):
+        """
+        Display an HTML page describing the test results to the client.
+        """
+
         suite, error = _create_suite(package_name, test_name, _LOCAL_TEST_DIR)
         if not error:
             self.response.out.write(_MAIN_PAGE_CONTENT % (_test_suite_to_json(suite), _WEB_TEST_DIR, __version__))
@@ -254,6 +265,11 @@ class MainTestPageHandler(webapp.RequestHandler):
             self.response.out.write(error)
 
     def _render_plain(self, package_name, test_name):
+        """
+        Returns unittest's plaintext output without modifications to the
+        client.
+        """
+
         self.response.headers["Content-Type"] = "text/plain"
 
         output_buffer = StringIO.StringIO()
