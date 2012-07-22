@@ -15,7 +15,7 @@ Usage:
 3. Launch the development web server.  To run all tests, point your browser to:
 
    http://localhost:8080/test     (Modify the port if necessary.)
-   
+
    For plain text output add '?format=plain' to the above URL.
    See README.TXT for information on how to run specific tests.
 
@@ -69,7 +69,7 @@ import django.utils.simplejson
 
 from xml.sax.saxutils import unescape
 from google.appengine.ext import webapp
-from google.appengine.api import apiproxy_stub_map  
+from google.appengine.api import apiproxy_stub_map
 from google.appengine.api import datastore_file_stub
 from google.appengine.ext.webapp.util import run_wsgi_app
 
@@ -150,10 +150,10 @@ def django_json_test_runner(request):
 
 class GAETestCase(unittest.TestCase):
     """TestCase parent class that provides the following assert functions
-        * assertHtmlEqual - compare two HTML string ignoring the 
+        * assertHtmlEqual - compare two HTML string ignoring the
             out-of-element blanks and other differences acknowledged in standard.
     """
-    
+
     def assertHtmlEqual(self, html1, html2):
         if html1 is None or html2 is None:
             raise self.failureException, "argument is None"
@@ -170,7 +170,7 @@ class GAETestCase(unittest.TestCase):
         html = re.sub(r"[ ]*>[ ]*", ">", html)
         html = re.sub(r"[ ]*<[ ]*", "<", html)
         return unescape(html)
-    
+
     def _findHtmlDifference(self, html1, html2):
         display_window_width = 41
         html1_len = len(html1)
@@ -178,20 +178,20 @@ class GAETestCase(unittest.TestCase):
         for i in range(html1_len):
             if i >= html2_len or html1[i] != html2[i]:
                 break
-            
+
         if html1_len < html2_len:
             html1 += " " * (html2_len - html1_len)
             length = html2_len
         else:
             html2 += " " * (html1_len - html2_len)
             length = html1_len
-            
+
         if length <= display_window_width:
             return "\n%s\n%s\n%s^" % (html1, html2, "_" * i)
-        
+
         start = i - display_window_width / 2
         end = i + 1 + display_window_width / 2
-        
+
         if start < 0:
             adjust = -start
             start += adjust
@@ -211,10 +211,10 @@ class GAETestCase(unittest.TestCase):
             leading_dots = "..."
             ending_dots = "..."
         return '\n%s%s%s\n%s\n%s^' % (leading_dots, html1[start:end], ending_dots, leading_dots+html2[start:end]+ending_dots, "_" * (i - start + len(leading_dots)))
-    
+
     assertHtmlEquals = assertHtmlEqual
-        
-      
+
+
 ##############################################################################
 # Main request handler
 ##############################################################################
@@ -243,7 +243,7 @@ class MainTestPageHandler(webapp.RequestHandler):
             error = _log_error("The format '%s' is not valid." % cgi.escape(format))
             self.error(404)
             self.response.out.write(error)
-            
+
     def _render_html(self, package_name, test_name):
         suite, error = _create_suite(package_name, test_name, _LOCAL_TEST_DIR)
         if not error:
@@ -251,7 +251,7 @@ class MainTestPageHandler(webapp.RequestHandler):
         else:
             self.error(404)
             self.response.out.write(error)
-        
+
     def _render_plain(self, package_name, test_name):
         self.response.headers["Content-Type"] = "text/plain"
         runner = unittest.TextTestRunner(self.response.out)
@@ -290,8 +290,8 @@ class JsonTestResult(unittest.TestResult):
     def _list(self, list):
         dict = []
         for test, err in list:
-            d = { 
-              'desc': test.shortDescription() or str(test), 
+            d = {
+              'desc': test.shortDescription() or str(test),
               'detail': cgi.escape(err),
             }
             dict.append(d)
@@ -310,7 +310,7 @@ class JsonTestRunner:
 
 
 class JsonTestRunHandler(webapp.RequestHandler):
-    def get(self):    
+    def get(self):
         self.response.headers["Content-Type"] = "text/javascript"
         test_name = self.request.get("name")
         _load_default_test_modules(_LOCAL_TEST_DIR)
@@ -356,7 +356,7 @@ def _create_suite(package_name, test_name, test_dir):
                 module_names = package.__all__
                 for module_name in module_names:
                     suite.addTest(loader.loadTestsFromName('%s.%s' % (package_name, module_name)))
-    
+
         if suite.countTestCases() == 0:
             raise Exception("'%s' is not found or does not contain any tests." %  \
                             (test_name or package_name or 'local directory: \"%s\"' % _LOCAL_TEST_DIR))
@@ -406,7 +406,7 @@ def _test_suite_to_json(suite):
             else:
                 method_list = mod_dict[class_name]
                 method_list.append(method_name)
-                
+
     return django.utils.simplejson.dumps(test_dict)
 
 
@@ -418,14 +418,14 @@ def _run_test_suite(runner, suite):
     test suite, run the test suite, and restore the development apiproxy.
     This isolates the test datastore from the development datastore.
 
-    """        
+    """
     original_apiproxy = apiproxy_stub_map.apiproxy
     try:
-       apiproxy_stub_map.apiproxy = apiproxy_stub_map.APIProxyStubMap() 
-       temp_stub = datastore_file_stub.DatastoreFileStub('GAEUnitDataStore', None, None, trusted=True)  
+       apiproxy_stub_map.apiproxy = apiproxy_stub_map.APIProxyStubMap()
+       temp_stub = datastore_file_stub.DatastoreFileStub('GAEUnitDataStore', None, None, trusted=True)
        apiproxy_stub_map.apiproxy.RegisterStub('datastore', temp_stub)
        # Allow the other services to be used as-is for tests.
-       for name in ['user', 'urlfetch', 'mail', 'memcache', 'images', 'blobstore', 'taskqueue']: 
+       for name in ['user', 'urlfetch', 'mail', 'memcache', 'images', 'blobstore', 'taskqueue']:
            apiproxy_stub_map.apiproxy.RegisterStub(name, original_apiproxy.GetStub(name))
        runner.run(suite)
     finally:
@@ -436,7 +436,7 @@ def _log_error(s):
    logging.warn(s)
    return s
 
-           
+
 ################################################
 # Browser HTML, CSS, and Javascript
 ################################################
@@ -473,7 +473,7 @@ _MAIN_PAGE_CONTENT = """
           alert("XMLHttpRequest not supported");
           return null;
         }
-        
+
         function requestTestRun(moduleName, className, methodName) {
             var methodSuffix = "";
             if (methodName) {
@@ -528,17 +528,17 @@ _MAIN_PAGE_CONTENT = """
                     testFailed();
                 }
             };
-            xmlHttp.send(null);            
+            xmlHttp.send(null);
         }
 
         function testFailed() {
             document.getElementById("testindicator").style.backgroundColor="red";
         }
-        
+
         function testSucceed() {
             document.getElementById("testindicator").style.backgroundColor="green";
         }
-        
+
         function runTests() {
             // Run each test asynchronously (concurrently).
             var totalTests = 0;
@@ -609,7 +609,7 @@ application = webapp.WSGIApplication([('%s'      % _WEB_TEST_DIR, MainTestPageHa
                                       debug=True)
 
 def main():
-    run_wsgi_app(application)                                    
+    run_wsgi_app(application)
 
 if __name__ == '__main__':
     main()
