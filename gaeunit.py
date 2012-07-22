@@ -529,7 +529,6 @@ def _create_suite(package_name, test_name, test_dir,
             raise Exception("'%s' is not found or does not contain any tests." %  \
                             (test_name or package_name or 'local directory: \"%s\"' % _LOCAL_TEST_DIR))
     except Exception, e:
-        print e
         error = str(e)
         _log_error(error)
 
